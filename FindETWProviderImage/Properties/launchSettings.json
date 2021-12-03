@@ -1,0 +1,20 @@
+{
+  "profiles": {
+    "Known Good - Scoped": {
+      "commandName": "Project",
+      "commandLineArgs": "{f4e1897c-bb5d-5668-f1d8-040f4d8dd344} C:\\Windows\\System32\\ntoskrnl.exe"
+    },
+    "Known Good - Recurse": {
+      "commandName": "Project",
+      "commandLineArgs": "{16C6501A-FF2D-46EA-868D-8F96CB0CB52D} C:\\Windows\\System32\\drivers\\"
+    },
+    "Known Bad - Recurse": {
+      "commandName": "Project",
+      "commandLineArgs": "{1B6A0612-ECA4-46A3-B710-D9C1BBF38DB5} C:\\Windows\\System32\\drivers\\"
+    },
+    "Known Bad - Scoped": {
+      "commandName": "Project",
+      "commandLineArgs": "{1B6A0612-ECA4-46A3-B710-D9C1BBF38DB5} C:\\Windows\\System32\\drivers\\mssecflt.sys"
+    }
+  }
+}
