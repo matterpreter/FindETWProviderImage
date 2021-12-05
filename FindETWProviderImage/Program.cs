@@ -20,7 +20,7 @@ namespace FindETWProviderImage
         public struct ProviderImage
         {
             public string FilePath = string.Empty;
-            public List<Reference> References = new List<Reference>();
+            public List<Reference> References = new();
         }
 
         static void Main(string[] args)
@@ -48,6 +48,8 @@ namespace FindETWProviderImage
                 // Check if the search target is a directory
                 if ((File.GetAttributes(SearchRoot) & FileAttributes.Directory) == FileAttributes.Directory)
                 {
+                    Stopwatch sw = Stopwatch.StartNew();
+
                     // Build the list of files
                     List<string> TargetFiles = GetAllFiles(SearchRoot);
                     Console.WriteLine($"Searching {TargetFiles.Count} files for {TargetGuid}...");
@@ -56,32 +58,24 @@ namespace FindETWProviderImage
                     {
                         try
                         {
-                            if (TargetFile == @"C:\Windows\System32\ntoskrnl.exe")
-                            {
-                                // For testing
-                            }
-                            ProviderImage Image = ParseSingleFile(SearchRoot, ProviderGuidBytes);
-                            Console.WriteLine($"Target File: {Image.FilePath}\n" +
+                            ProviderImage Image = ParseSingleFile(TargetFile, ProviderGuidBytes);
+                            Console.WriteLine($"\nTarget File: {Image.FilePath}\n" +
                                 $"GUID: {TargetGuid}\n" +
                                 $"Found {Image.References.Count} references:");
+
                             foreach (Reference reference in Image.References)
                             {
                                 Console.WriteLine($"  {Image.References.IndexOf(reference) + 1}) Offset: 0x{reference.Offset:x} RVA: 0x{reference.RVA:x}");
                             }
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
-                            if (ex is DirectoryNotFoundException)
-                            {
-                                Console.WriteLine($"Couldn't access {TargetFile}");
-                            }
                             continue;
                         }
-                        //if (ParseSingleFile(TargetFile, ProviderGuidBytes))
-                        //{
-                        //    return;
-                        //}
                     }
+
+                    sw.Stop();
+                    Console.WriteLine($"\nTime Elapsed: {sw.ElapsedMilliseconds} milliseconds");
                 }
                 else
                 {
@@ -149,7 +143,7 @@ namespace FindETWProviderImage
 
         static List<int> BoyerMooreSearch(byte[] ProviderGuid, byte[] FileBytes)
         {
-            List<int> Offsets = new List<int>();
+            List<int> Offsets = new();
 
             int[] Alphabet = new int[256];
             for (int i = 0; i < Alphabet.Length; i++) 
@@ -202,8 +196,8 @@ namespace FindETWProviderImage
 
         static int OffsetToRVA(byte[] FileBytes, int Offset)
         {
-            MemoryStream stream = new MemoryStream(FileBytes);
-            PEReader reader = new PEReader(stream);
+            MemoryStream stream = new(FileBytes);
+            PEReader reader = new(stream);
 
             var SectionHeaders = reader.PEHeaders.SectionHeaders;
             foreach (SectionHeader Header in SectionHeaders)
@@ -219,16 +213,14 @@ namespace FindETWProviderImage
 
         static List<string> GetAllFiles(string SearchDirectory)
         {
-            EnumerationOptions Options = new EnumerationOptions()
+            EnumerationOptions Options = new()
             {
                 IgnoreInaccessible = true,
-                RecurseSubdirectories = true
+                RecurseSubdirectories = true,
             };
 
-            List<string> AllFiles = new List<string>(Directory.EnumerateFiles(SearchDirectory, "*.*", Options)
+            return new List<string>(Directory.EnumerateFiles(SearchDirectory, "*.*", Options)
                 .Where(s => s.EndsWith(".dll") || s.EndsWith(".exe") || s.EndsWith(".sys")));
-
-            return AllFiles;            
         }
     }
 }
