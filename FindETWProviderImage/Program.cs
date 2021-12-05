@@ -1,144 +1,100 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection.PortableExecutable;
+using System.Threading;
 
 namespace FindETWProviderImage
 {
     internal class Program
     {
         private static readonly string Usage = "FindETWProviderImage.exe \"{provider-guid}\" \"<search_path>\"";
+        private static readonly int MaxThreads = 4;
+        private static string TargetGuid;
         private static byte[] ProviderGuidBytes;
-
-        public struct Reference
-        {
-            public int Offset;
-            public int RVA;
-        }
-        public struct ProviderImage
-        {
-            public string FilePath = string.Empty;
-            public List<Reference> References = new();
-        }
+        private static ConcurrentQueue<string> TargetFiles = new();
+        private static int TotalReferences = 0;
 
         static void Main(string[] args)
         {
-            try
+            if (args.Length < 2)
             {
-                if (args.Length < 2)
+                Console.WriteLine(Usage);
+                return;
+            }
+            if (!Guid.TryParse(args[0], out _))
+            {
+                throw new ArgumentException("The GUID provided does not appear to be valid");
+            }
+            if (!Directory.Exists(args[1]) && !File.Exists(args[1]))
+            {
+                throw new FileNotFoundException("The target file or directory does not exist");
+            }
+
+            Stopwatch sw = Stopwatch.StartNew();
+
+            TargetGuid = args[0];
+            ProviderGuidBytes = Guid.Parse(args[0]).ToByteArray();
+            string SearchRoot = args[1];
+
+            // Check if the search target is a directory
+            if ((File.GetAttributes(SearchRoot) & FileAttributes.Directory) == FileAttributes.Directory)
+            {
+                // Build the list of files
+                TargetFiles = GetAllFiles(SearchRoot);
+                Console.WriteLine($"Searching {TargetFiles.Count} files for {TargetGuid}...");
+
+                Thread[] Threads = new Thread[MaxThreads];
+                for (int i = 0; i < MaxThreads; i++)
                 {
-                    Console.WriteLine(Usage);
-                    return;
-                }
-                if (!Guid.TryParse(args[0], out _))
-                {
-                    throw new ArgumentException("The GUID provided does not appear to be valid");
-                }
-                if (!Directory.Exists(args[1]) && !File.Exists(args[1]))
-                {
-                    throw new FileNotFoundException("The target file or directory does not exist");
-                }
-
-                string TargetGuid = args[0];
-                ProviderGuidBytes = Guid.Parse(args[0]).ToByteArray();
-                string SearchRoot = args[1];
-
-                // Check if the search target is a directory
-                if ((File.GetAttributes(SearchRoot) & FileAttributes.Directory) == FileAttributes.Directory)
-                {
-                    Stopwatch sw = Stopwatch.StartNew();
-
-                    // Build the list of files
-                    List<string> TargetFiles = GetAllFiles(SearchRoot);
-                    Console.WriteLine($"Searching {TargetFiles.Count} files for {TargetGuid}...");
-
-                    foreach (string TargetFile in TargetFiles)
-                    {
-                        try
-                        {
-                            ProviderImage Image = ParseSingleFile(TargetFile, ProviderGuidBytes);
-                            Console.WriteLine($"\nTarget File: {Image.FilePath}\n" +
-                                $"GUID: {TargetGuid}\n" +
-                                $"Found {Image.References.Count} references:");
-
-                            foreach (Reference reference in Image.References)
-                            {
-                                Console.WriteLine($"  {Image.References.IndexOf(reference) + 1}) Offset: 0x{reference.Offset:x} RVA: 0x{reference.RVA:x}");
-                            }
-                        }
-                        catch (Exception)
-                        {
-                            continue;
-                        }
-                    }
-
-                    sw.Stop();
-                    Console.WriteLine($"\nTime Elapsed: {sw.ElapsedMilliseconds} milliseconds");
-                }
-                else
-                {
-                    Stopwatch sw = Stopwatch.StartNew();
-
-                    try
-                    {
-                        ProviderImage Image = ParseSingleFile(SearchRoot, ProviderGuidBytes);
-                        Console.WriteLine($"Target File: {Image.FilePath}\n" +
-                            $"GUID: {TargetGuid}\n" + 
-                            $"Found {Image.References.Count} references:");
-                        foreach (Reference reference in Image.References)
-                        {
-                            Console.WriteLine($"  {Image.References.IndexOf(reference)+1}) Offset: 0x{reference.Offset:x} RVA: 0x{reference.RVA:x}");
-                        }
-                    }
-                    catch (ProviderNotFoundException)
-                    {
-                        Console.WriteLine("Found no reference to the GUID in the target file");
-                    }
-
-                    sw.Stop();
-                    Console.WriteLine($"\nTime Elapsed: {sw.ElapsedMilliseconds} milliseconds");
+                    Threads[i] = new Thread(() => ParseFileList(ProviderGuidBytes));
+                    Threads[i].Start();
+                    Threads[i].Join();
                 }
             }
-            catch (Exception ) 
+            else
             {
-                //
+                TargetFiles.Enqueue(SearchRoot);
+                ParseFileList(ProviderGuidBytes);
+                
             }
+
+            Console.WriteLine($"\nTotal References: {TotalReferences}");
+            sw.Stop();
+            Console.WriteLine($"Time Elapsed: {sw.ElapsedMilliseconds / 1000.0000} seconds");
         }
 
         public class ProviderNotFoundException : Exception { }
 
-        static ProviderImage ParseSingleFile(string FilePath, byte[] ProviderGuid)
+        static void ParseFileList(byte[] ProviderGuid)
         {
-            byte[] FileBytes = File.ReadAllBytes(FilePath);
-
-            List<int> Offsets = BoyerMooreSearch(ProviderGuidBytes, FileBytes);
-            //Console.WriteLine($"Found {Offsets.Count} references");
-            
-            if (Offsets.Count > 0)
+            string FilePath;
+            while (!TargetFiles.IsEmpty)
             {
-                ProviderImage Provider = new ProviderImage() 
-                { 
-                    FilePath = FilePath
-                };
+                TargetFiles.TryDequeue(out FilePath);
+                byte[] FileBytes = File.ReadAllBytes(FilePath);
 
-                foreach (var Offset in Offsets)
+                List<int> Offsets = BoyerMooreSearch(ProviderGuidBytes, FileBytes);
+
+                if (Offsets.Count > 0)
                 {
-                    Provider.References.Add(new Reference() { Offset = Offset, RVA = OffsetToRVA(FileBytes, Offset) });
-                    //Console.WriteLine("  {0}) Offset: 0x{1:x} RVA: 0x{2:x}",
-                    //    Offsets.IndexOf(Offset)+1,
-                    //    Offset,
-                    //    OffsetToRVA(FileBytes, Offset));
+                    Console.WriteLine($"\nTarget File: {FilePath}\n" +
+                                $"GUID: {TargetGuid}\n" +
+                                $"Found {Offsets.Count} references:");
+                    foreach (var Offset in Offsets)
+                    {
+                        Console.WriteLine("  {0}) Offset: 0x{1:x} RVA: 0x{2:x}",
+                            Offsets.IndexOf(Offset) + 1,
+                            Offset,
+                            OffsetToRVA(FileBytes, Offset));
+                    }
+
+                    TotalReferences += Offsets.Count;
                 }
-
-                return Provider;
             }
-            else
-            {
-                throw new ProviderNotFoundException();
-            }
-
         }
 
         static List<int> BoyerMooreSearch(byte[] ProviderGuid, byte[] FileBytes)
@@ -208,10 +164,10 @@ namespace FindETWProviderImage
                 }
             }
 
-            return 0;
+            return Offset;
         }
 
-        static List<string> GetAllFiles(string SearchDirectory)
+        static ConcurrentQueue<string> GetAllFiles(string SearchDirectory)
         {
             EnumerationOptions Options = new()
             {
@@ -219,7 +175,7 @@ namespace FindETWProviderImage
                 RecurseSubdirectories = true,
             };
 
-            return new List<string>(Directory.EnumerateFiles(SearchDirectory, "*.*", Options)
+            return new ConcurrentQueue<string>(Directory.EnumerateFiles(SearchDirectory, "*.*", Options)
                 .Where(s => s.EndsWith(".dll") || s.EndsWith(".exe") || s.EndsWith(".sys")));
         }
     }
