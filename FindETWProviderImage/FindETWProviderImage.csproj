@@ -5,6 +5,7 @@
     <TargetFramework>net6.0-windows10.0.19041.0</TargetFramework>
     <StartupObject>FindETWProviderImage.Program</StartupObject>
     <Platforms>AnyCPU;x64;x86</Platforms>
+    <PackageProjectUrl>https://github.com/matterpreter/FindETWProviderImage</PackageProjectUrl>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
