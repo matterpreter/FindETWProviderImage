@@ -1,11 +1,11 @@
 # FindETWProviderImage
-Quickly search for references to a GUID in a target directory.
+Quickly search for references to a GUID in a target directory
 
 ## Usage:
 ```
 .\FindETWProviderImage.exe "your-guid-here" "\path\to\search\directory"
 ```
-
+![](demo.gif)
 
 
 ## To Do:
