@@ -5,7 +5,7 @@ Quickly search for references to a GUID in a target directory
 ```
 .\FindETWProviderImage.exe "your-guid-here" "\path\to\search\directory"
 ```
-![](demo.gif)
+https://user-images.githubusercontent.com/1756781/144869284-98f013e5-dda2-436e-9f1a-3f0446d90aea.mp4
 
 
 ## To Do:
