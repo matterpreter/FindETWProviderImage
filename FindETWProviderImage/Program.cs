@@ -5,18 +5,17 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection.PortableExecutable;
-using System.Threading;
+using System.Threading.Tasks;
 
 namespace FindETWProviderImage
 {
     internal class Program
     {
         private static readonly string Usage = "FindETWProviderImage.exe \"{provider-guid}\" \"<search_path>\"";
-        private static readonly int MaxThreads = 4;
 
         private static string TargetGuid;
         private static byte[] ProviderGuidBytes;
-        private static ConcurrentQueue<string> TargetFiles = new();
+        private static HashSet<string> TargetFiles = new();
         private static int TotalReferences = 0;
 
         static void Main(string[] args)
@@ -48,19 +47,11 @@ namespace FindETWProviderImage
                 TargetFiles = GetAllFiles(SearchRoot);
                 Console.WriteLine($"Searching {TargetFiles.Count} files for {TargetGuid}...");
 
-                Thread[] Threads = new Thread[MaxThreads];
-                for (int i = 0; i < MaxThreads; i++)
-                {
-                    Threads[i] = new Thread(() => ParseFileList(ProviderGuidBytes));
-                    Threads[i].Start();
-                    Threads[i].Join();
-                }
+                Parallel.ForEach(TargetFiles, file => ParseFile(file, ProviderGuidBytes));
             }
             else
             {
-                TargetFiles.Enqueue(SearchRoot);
-                ParseFileList(ProviderGuidBytes);
-                
+                ParseFile(SearchRoot, ProviderGuidBytes);                
             }
 
             Console.WriteLine($"\nTotal References: {TotalReferences}");
@@ -68,33 +59,26 @@ namespace FindETWProviderImage
             Console.WriteLine($"Time Elapsed: {sw.ElapsedMilliseconds / 1000.0000} seconds");
         }
 
-        public class ProviderNotFoundException : Exception { }
-
-        static void ParseFileList(byte[] ProviderGuid)
+        static void ParseFile(string FilePath, byte[] ProviderGuid)
         {
-            string FilePath;
-            while (!TargetFiles.IsEmpty)
+            byte[] FileBytes = File.ReadAllBytes(FilePath);
+
+            List<int> Offsets = BoyerMooreSearch(ProviderGuidBytes, FileBytes);
+
+            if (Offsets.Count > 0)
             {
-                TargetFiles.TryDequeue(out FilePath);
-                byte[] FileBytes = File.ReadAllBytes(FilePath);
-
-                List<int> Offsets = BoyerMooreSearch(ProviderGuidBytes, FileBytes);
-
-                if (Offsets.Count > 0)
+                Console.WriteLine($"\nTarget File: {FilePath}\n" +
+                            $"GUID: {TargetGuid}\n" +
+                            $"Found {Offsets.Count} references:");
+                foreach (var Offset in Offsets)
                 {
-                    Console.WriteLine($"\nTarget File: {FilePath}\n" +
-                                $"GUID: {TargetGuid}\n" +
-                                $"Found {Offsets.Count} references:");
-                    foreach (var Offset in Offsets)
-                    {
-                        Console.WriteLine("  {0}) Offset: 0x{1:x} RVA: 0x{2:x}",
-                            Offsets.IndexOf(Offset) + 1,
-                            Offset,
-                            OffsetToRVA(FileBytes, Offset));
-                    }
-
-                    TotalReferences += Offsets.Count;
+                    Console.WriteLine("  {0}) Offset: 0x{1:x} RVA: 0x{2:x}",
+                        Offsets.IndexOf(Offset) + 1,
+                        Offset,
+                        OffsetToRVA(FileBytes, Offset));
                 }
+
+                TotalReferences += Offsets.Count;
             }
         }
 
@@ -168,7 +152,7 @@ namespace FindETWProviderImage
             return Offset;
         }
 
-        static ConcurrentQueue<string> GetAllFiles(string SearchDirectory)
+        static HashSet<string> GetAllFiles(string SearchDirectory)
         {
             EnumerationOptions Options = new()
             {
@@ -176,8 +160,8 @@ namespace FindETWProviderImage
                 RecurseSubdirectories = true,
             };
 
-            return new ConcurrentQueue<string>(Directory.EnumerateFiles(SearchDirectory, "*.*", Options)
-                .Where(s => s.EndsWith(".dll") || s.EndsWith(".exe") || s.EndsWith(".sys")));
+            return Directory.EnumerateFiles(SearchDirectory, "*.*", Options)
+                .Where(s => s.EndsWith(".dll") || s.EndsWith(".exe") || s.EndsWith(".sys")).ToHashSet<string>();
         }
     }
 }
