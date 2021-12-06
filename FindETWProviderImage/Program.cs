@@ -13,6 +13,7 @@ namespace FindETWProviderImage
     {
         private static readonly string Usage = "FindETWProviderImage.exe \"{provider-guid}\" \"<search_path>\"";
         private static readonly int MaxThreads = 4;
+
         private static string TargetGuid;
         private static byte[] ProviderGuidBytes;
         private static ConcurrentQueue<string> TargetFiles = new();
@@ -160,7 +161,7 @@ namespace FindETWProviderImage
             {
                 if (Offset > Header.VirtualAddress && Offset < Header.VirtualAddress + Header.VirtualSize)
                 {
-                    return Offset + Header.PointerToRawData;
+                    return Offset + Header.VirtualAddress - Header.PointerToRawData;
                 }
             }
 
