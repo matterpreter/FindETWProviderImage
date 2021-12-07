@@ -15,6 +15,14 @@
     "Known Bad - Scoped": {
       "commandName": "Project",
       "commandLineArgs": "{1B6A0612-ECA4-46A3-B710-D9C1BBF38DB5} C:\\Windows\\System32\\ntoskrnl.exe"
+    },
+    "Known Bad - Missing File": {
+      "commandName": "Project",
+      "commandLineArgs": "{1B6A0612-ECA4-46A3-B710-D9C1BBF38DB5} C:\\Windows\\System32\\ThisFileDoesntExist.exe"
+    },
+    "Known Bad - Invalid GUID": {
+      "commandName": "Project",
+      "commandLineArgs": "{bad-guid} C:\\Windows\\System32\\ntoskrnl.exe"
     }
   }
 }
