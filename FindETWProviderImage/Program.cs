@@ -8,69 +8,60 @@ using System.Threading.Tasks;
 
 namespace FindETWProviderImage
 {
-    internal class Program
+    public class Program
     {
         private static readonly string Usage = 
             "FindETWProviderImage.exe \"{provider-guid}\" \"<search_path>\"";
 
         private static string TargetGuid;
-        private static byte[] ProviderGuidBytes;
+        public static byte[] ProviderGuidBytes;
         private static HashSet<string> TargetFiles = new();
-        private static int TotalReferences = 0;
+        public static int TotalReferences = 0;
 
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
-            try
+            if (args.Length < 2)
             {
-                if (args.Length < 2)
-                {
-                    Console.WriteLine(Usage);
-                    return;
-                }
-                if (!Guid.TryParse(args[0], out _))
-                {
-                    throw new ArgumentException("The GUID provided does not appear to be valid");
-                }
-                if (!Directory.Exists(args[1]) && !File.Exists(args[1]))
-                {
-                    throw new FileNotFoundException("The target file or directory does not exist");
-                }
-
-                Stopwatch sw = Stopwatch.StartNew();
-
-                TargetGuid = args[0];
-                ProviderGuidBytes = Guid.Parse(args[0]).ToByteArray();
-                string SearchRoot = args[1];
-
-                // Check if the search target is a directory
-                if ((File.GetAttributes(SearchRoot) & FileAttributes.Directory) == FileAttributes.Directory)
-                {
-                    // Create a list of files to check by recursively searching the target directory
-                    TargetFiles = GetAllFiles(SearchRoot);
-                    Console.WriteLine($"Searching {TargetFiles.Count} files for {TargetGuid}...\n");
-
-                    // Iterate over the collection of files
-                    Parallel.ForEach(TargetFiles, file => ParseFile(file, ProviderGuidBytes));
-                }
-                else
-                {
-                    // Target is a single file
-                    ParseFile(SearchRoot, ProviderGuidBytes);
-                }
-
-                Console.WriteLine($"Total References: {TotalReferences}");
-                sw.Stop();
-                Console.WriteLine($"Time Elapsed: {sw.ElapsedMilliseconds / 1000.0000} seconds");
+                Console.WriteLine(Usage);
+                return;
             }
-            catch (Exception ex)
+            if (!Guid.TryParse(args[0], out _))
             {
-                Console.WriteLine(ex.Message);
-                Console.WriteLine(ex.StackTrace);
+                throw new ArgumentException("The GUID provided does not appear to be valid");
             }
-            
+            if (!Directory.Exists(args[1]) && !File.Exists(args[1]))
+            {
+                throw new FileNotFoundException();
+            }
+
+            Stopwatch sw = Stopwatch.StartNew();
+
+            TargetGuid = args[0];
+            ProviderGuidBytes = Guid.Parse(args[0]).ToByteArray();
+            string SearchRoot = args[1];
+
+            // Check if the search target is a directory
+            if ((File.GetAttributes(SearchRoot) & FileAttributes.Directory) == FileAttributes.Directory)
+            {
+                // Create a list of files to check by recursively searching the target directory
+                TargetFiles = GetAllFiles(SearchRoot);
+                Console.WriteLine($"Searching {TargetFiles.Count} files for {TargetGuid}...\n");
+
+                // Iterate over the collection of files
+                Parallel.ForEach(TargetFiles, file => ParseFile(file/*, ProviderGuidBytes*/));
+            }
+            else
+            {
+                // Target is a single file
+                ParseFile(SearchRoot/*, ProviderGuidBytes*/);
+            }
+
+            Console.WriteLine($"Total References: {TotalReferences}");
+            sw.Stop();
+            Console.WriteLine($"Time Elapsed: {sw.ElapsedMilliseconds / 1000.0000} seconds");
         }
 
-        static void ParseFile(string FilePath, byte[] ProviderGuid)
+        public static void ParseFile(string FilePath/*, byte[] ProviderGuid*/)
         {
             byte[] FileBytes = File.ReadAllBytes(FilePath);
 
@@ -92,7 +83,7 @@ namespace FindETWProviderImage
             }
         }
 
-        static List<int> BoyerMooreSearch(byte[] ProviderGuid, byte[] FileBytes)
+        public static List<int> BoyerMooreSearch(byte[] ProviderGuid, byte[] FileBytes)
         {
             List<int> Offsets = new();
 
@@ -163,7 +154,7 @@ namespace FindETWProviderImage
             return Offset;
         }
 
-        static HashSet<string> GetAllFiles(string SearchDirectory)
+        public static HashSet<string> GetAllFiles(string SearchDirectory)
         {
             EnumerationOptions Options = new()
             {
