@@ -1,5 +1,5 @@
 # FindETWProviderImage
-Quickly search for references to a GUID in a target directory
+Quickly search for references to a GUID in DLLs, EXEs, and drivers
 
 ## Usage:
 ```
