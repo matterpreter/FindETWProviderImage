@@ -20,4 +20,8 @@
     <Optimize>False</Optimize>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="PeNet" Version="2.9.1" />
+  </ItemGroup>
+
 </Project>

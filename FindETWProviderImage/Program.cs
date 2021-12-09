@@ -78,14 +78,23 @@ namespace FindETWProviderImage
 
             if (Offsets.Count > 0)
             {
-                Console.WriteLine($"Target File: {FilePath}\n" +
-                            $"Found {Offsets.Count} references:");
+                Console.WriteLine("Target File: {0}\n" +
+                            "Registration Function Imported: {1}\n" +
+                            "Found {2} reference{3}:",
+                            FilePath,
+                            DoesImageImportEventRegistrationAPI(FilePath) ? "True" : "False",
+                            Offsets.Count,
+                            Offsets.Count > 1 ? "s" : "");
+
                 foreach (var Offset in Offsets)
                 {
-                    Console.WriteLine("  {0}) Offset: 0x{1:x} RVA: 0x{2:x}",
+                    string SectionName;
+
+                    Console.WriteLine("  {0}) Offset: 0x{1:x} RVA: 0x{2:x}{3}",
                         Offsets.IndexOf(Offset) + 1,
                         Offset,
-                        OffsetToRVA(FileBytes, Offset));
+                        OffsetToRVA(FileBytes, Offset, out SectionName),
+                        string.IsNullOrEmpty(SectionName) ? "" : string.Format(" ({0})", SectionName));
                 }
                 Console.WriteLine();
                 TotalReferences += Offsets.Count;
@@ -145,7 +154,7 @@ namespace FindETWProviderImage
             return Offsets;
         }
 
-        static int OffsetToRVA(byte[] FileBytes, int Offset)
+        static int OffsetToRVA(byte[] FileBytes, int Offset, out string SectionName)
         {
             MemoryStream stream = new(FileBytes);
             PEReader reader = new(stream);
@@ -156,10 +165,12 @@ namespace FindETWProviderImage
                 if (Offset > Header.VirtualAddress && 
                     Offset < Header.VirtualAddress + Header.VirtualSize)
                 {
+                    SectionName = Header.Name;
                     return Offset + Header.VirtualAddress - Header.PointerToRawData;
                 }
             }
 
+            SectionName = SectionHeaders.ElementAt(0).Name;
             return Offset;
         }
 
@@ -174,6 +185,27 @@ namespace FindETWProviderImage
             return Directory.EnumerateFiles(SearchDirectory, "*.*", Options).Where(
                 s => s.EndsWith(".dll") || s.EndsWith(".exe") || s.EndsWith(".sys"))
                 .ToHashSet();
+        }
+
+        static bool DoesImageImportEventRegistrationAPI(string FilePath)
+        {
+            PeNet.PeFile pe = new PeNet.PeFile(FilePath);
+            bool Found = false;
+
+            if (pe.ImportedFunctions != null)
+            {
+                foreach (var Function in pe.ImportedFunctions)
+                {
+                    if (Function.Name == "EventRegister" || Function.Name == "EtwRegister")
+                    {
+                        Found = true;
+                        break;
+                    }
+                }
+            }
+
+            return Found;
+            
         }
     }
 }
