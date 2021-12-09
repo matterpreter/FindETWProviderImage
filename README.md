@@ -15,7 +15,7 @@ My workflow is to load the image into the disassembler, do the initial automatic
 
 ## To Do:
 - [X] Add checks for `EventRegister()` and `EtwRegister()` to help identify providers
-- [ ] Add provider name to GUID resolution functionality
+- [X] Add provider name to GUID resolution functionality
 
 ## How it Works
 1. If a provider name was specified, translate it to a GUID by parsing the registry and return the image if found there
