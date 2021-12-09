@@ -1,9 +1,11 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection.PortableExecutable;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace FindETWProviderImage
@@ -11,7 +13,7 @@ namespace FindETWProviderImage
     public class Program
     {
         private static readonly string Usage = 
-            "FindETWProviderImage.exe \"{provider-guid}\" \"<search_path>\"";
+            "FindETWProviderImage.exe \"<{provider-guid}|Provider-Name>\" \"<search_path>\"";
 
         private static string TargetGuid;
         public static byte[] ProviderGuidBytes;
@@ -25,19 +27,39 @@ namespace FindETWProviderImage
                 Console.WriteLine(Usage);
                 return;
             }
-            if (!Guid.TryParse(args[0], out _))
-            {
-                throw new ArgumentException("The GUID provided does not appear to be valid");
-            }
+
             if (!Directory.Exists(args[1]) && !File.Exists(args[1]))
             {
                 throw new FileNotFoundException();
             }
 
+            if (Guid.TryParse(args[0], out _))
+            {
+                TargetGuid = args[0];
+            }
+            else
+            {
+                // If args[0] isn't a GUID, it has to be a provider name
+                string ImagePathFromRegistry;
+                TargetGuid = TranslateProviderNameToGuid(args[0], out ImagePathFromRegistry);
+
+                if (string.IsNullOrEmpty(TargetGuid))
+                {
+                    throw new ArgumentException("The provider name or GUID does not appear to be valid");
+                }
+                else
+                {
+                    Console.WriteLine($"Translated {args[0]} to {TargetGuid}");
+                    if (!string.IsNullOrEmpty(ImagePathFromRegistry))
+                    {
+                        Console.WriteLine($"Found provider in the registry: {ImagePathFromRegistry}\n");
+                    }
+                }
+            }
+            
             Stopwatch sw = Stopwatch.StartNew();
 
-            TargetGuid = args[0];
-            ProviderGuidBytes = Guid.Parse(args[0]).ToByteArray();
+            ProviderGuidBytes = Guid.Parse(TargetGuid).ToByteArray();
             string SearchRoot = args[1];
 
             // Check if the search target is a directory
@@ -197,6 +219,49 @@ namespace FindETWProviderImage
 
             return Found;
             
+        }
+        public static string TranslateProviderNameToGuid(string ProviderName, out string ImagePath)
+        {
+            ImagePath = string.Empty;
+
+            // Check #1 - https://docs.microsoft.com/en-us/windows/win32/wes/identifying-the-provider
+            using (RegistryKey RegKey = Registry.LocalMachine.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\WINEVT\Publishers", false))
+            {
+                foreach (string SubKeyName in RegKey.GetSubKeyNames())
+                {
+                    RegistryKey RegSubKey = RegKey.OpenSubKey(SubKeyName, false);
+                    string DefaultVal = RegSubKey.GetValue("").ToString();
+
+                    if (DefaultVal.Equals(ProviderName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ImagePath = NormalizePath(RegSubKey.GetValue("MessageFileName").ToString());
+                        return SubKeyName;
+                    }
+                }
+            }
+
+            // Check #2 - https://stackoverflow.com/a/61100379
+            using (RegistryKey RegKey = Registry.LocalMachine.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\WINEVT\Channels", false))
+            {
+                foreach (string SubKeyName in RegKey.GetSubKeyNames())
+                {
+                    if (SubKeyName.StartsWith(ProviderName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        RegistryKey SubKey = RegKey.OpenSubKey(SubKeyName,false);
+                        return SubKey.GetValue("OwningPublisher").ToString();
+                    }
+                }
+            }
+
+            return string.Empty;
+        }
+
+        public static string NormalizePath(string BasePath)
+        {
+            // https://stackoverflow.com/a/21058121
+            return Path.GetFullPath(new Uri(BasePath).LocalPath)
+               .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+               //.ToUpperInvariant();
         }
     }
 }

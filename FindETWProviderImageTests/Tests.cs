@@ -11,7 +11,7 @@ namespace FindETWProviderImageTests
     {
         [TestMethod]
         [ExpectedException(typeof(System.IO.FileNotFoundException))]
-        public void Invoke_InvalidSearchPath_ThrowsException()
+        public void Invoke_InvalidSearchPathWithGuid_ThrowsException()
         {
             string[] Args =
             {
@@ -23,7 +23,7 @@ namespace FindETWProviderImageTests
         }
 
         [TestMethod]
-        [ExpectedException(typeof(System.ArgumentException))]
+        [ExpectedException(typeof(ArgumentException))]
         public void Invoke_InvalidGuid_ThrowsException()
         {
             string[] Args =
@@ -34,6 +34,37 @@ namespace FindETWProviderImageTests
 
             Program.Main(Args);
         }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public void Invoke_InvalidProviderName_ThrowsException()
+        {
+            string[] Args =
+            {
+                "This-Provider-DoesNot-Exist",
+                @"C:\Windows\System32\ntdll.dll"
+            };
+
+            Program.Main(Args);
+        }
+
+        [TestMethod]
+        public void Invoke_ValidProviderName_ReturnsResults()
+        {
+            string[] Args =
+            {
+                "Microsoft-Windows-TaskScheduler",
+                @"C:\Windows\System32\schedsvc.dll"
+            };
+
+            Program.TotalReferences = 0;
+
+
+            Program.Main(Args);
+
+            Assert.IsTrue(Program.TotalReferences > 0); 
+        }
+
 
         [TestMethod]
         public void GetAllFiles_ValidPath_ReturnsListSizeGreaterThanZero()
@@ -51,6 +82,7 @@ namespace FindETWProviderImageTests
             string KnownValidGuid = @"{f4e1897c-bb5d-5668-f1d8-040f4d8dd344}";
             Program.ProviderGuidBytes = Guid.Parse(KnownValidGuid).ToByteArray();
             string TargetFile = @"C:\Windows\System32\ntoskrnl.exe";
+            Program.TotalReferences = 0;
 
             Program.ParseFile(TargetFile);
 
@@ -63,6 +95,8 @@ namespace FindETWProviderImageTests
             string KnownInvalidGuid = @"{DF69F475-C47D-4EB6-B601-82AF67434DE1}";
             Program.ProviderGuidBytes = Guid.Parse(KnownInvalidGuid).ToByteArray();
             string TargetFile = @"C:\Windows\System32\ntoskrnl.exe";
+            Program.TotalReferences = 0;
+
 
             Program.ParseFile(TargetFile);
 
@@ -105,5 +139,34 @@ namespace FindETWProviderImageTests
             Assert.IsTrue(Offsets.Count == 0);
         }
 
+        [TestMethod]
+        public void TranslateProviderNameToGuid_ValidGuid_ReturnsProviderName()
+        {
+            string ProviderGuid;
+            string ProviderName = "Microsoft-Windows-TaskScheduler";
+            string ImagePath;
+
+            ProviderGuid = Program.TranslateProviderNameToGuid(ProviderName, out ImagePath);
+
+            Console.WriteLine("Name: " + ProviderName);
+            Console.WriteLine("Guid: " + ProviderGuid);
+            Console.WriteLine("Path: " + ImagePath);
+
+            Assert.AreEqual(ProviderGuid, "{de7b24ea-73c8-4a09-985d-5bdadcfa9017}");
+            //Assert.AreEqual(ImagePath.ToLower(), @"c:\windows\system32\schedsvc.dll");
+        }
+
+        [TestMethod]
+        public void TranslateProviderNameToGuid_InvalidGuid_DoesNotReturnProviderName()
+        {
+            string ProviderGuid;
+            string ProviderName = "Some-Invalid-Provider-Name";
+            string ImagePath;
+
+            ProviderGuid = Program.TranslateProviderNameToGuid(ProviderName, out ImagePath);
+
+            Assert.AreEqual(ProviderGuid, string.Empty);
+            Assert.AreEqual(ImagePath, string.Empty);
+        }
     }
 }
