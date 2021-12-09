@@ -5,7 +5,7 @@ Quickly search for references to a GUID in DLLs, EXEs, and drivers
 ```
 .\FindETWProviderImage.exe "your-guid-here" "\path\to\search\directory"
 ```
-https://user-images.githubusercontent.com/1756781/144869284-98f013e5-dda2-436e-9f1a-3f0446d90aea.mp4
+https://user-images.githubusercontent.com/1756781/145394106-dd3e204c-fbaa-4b9a-8037-e3eac5d1c11e.mp4
 
 ## What Next?
 Since the tool is only returning basic offsets/RVAs, you'll still need to disassemble the image in Ghidra/IDA/etc.  
@@ -14,7 +14,7 @@ My workflow is to load the image into the disassembler, do the initial automatic
 ![](https://user-images.githubusercontent.com/1756781/145055293-a8967d22-32c4-4744-bc8a-f3c16c570950.png)
 
 ## To Do:
-- [ ] Add checks for `EventRegister()` and `EtwRegister()` to help identify providers
+- [X] Add checks for `EventRegister()` and `EtwRegister()` to help identify providers
 - [ ] Add provider name to GUID resolution functionality
 
 ## How it Works
