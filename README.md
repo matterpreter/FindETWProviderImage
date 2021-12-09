@@ -18,9 +18,10 @@ My workflow is to load the image into the disassembler, do the initial automatic
 - [ ] Add provider name to GUID resolution functionality
 
 ## How it Works
-1. Recursively search the supplied directory for files ending with `.dll`, `.exe`, or `.sys`
-2. Use a [Boyer-Moore search](https://en.wikipedia.org/wiki/Boyer%E2%80%93Moore_string-search_algorithm) to parse each of the files for the target GUID across 4 threads
-3. If references are found in the image, return the offset and relative virtual address (RVA) of each reference
+1. If a provider name was specified, translate it to a GUID by parsing the registry and return the image if found there
+2. Recursively search the supplied directory for files ending with `.dll`, `.exe`, or `.sys`
+3. Use a [Boyer-Moore search](https://en.wikipedia.org/wiki/Boyer%E2%80%93Moore_string-search_algorithm) to parse each of the files for the target GUID across 4 threads
+4. If references are found in the image, return the offset and relative virtual address (RVA) of each reference
 
 ## Credits
 Thanks to Matt Graeber ([@mattifestation](https://twitter.com/mattifestation)) for the original idea of identifying provider images by locating GUIDs inside the files
