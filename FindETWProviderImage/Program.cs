@@ -209,7 +209,7 @@ namespace FindETWProviderImage
             {
                 foreach (var Function in pe.ImportedFunctions)
                 {
-                    if (Function.Name == "EventRegister" || Function.Name == "EtwRegister")
+                    if (Function.Name == "EventRegister" || Function.Name == "EtwRegister" || Function.Name == "EtwEventRegister")
                     {
                         Found = true;
                         break;
