@@ -234,7 +234,7 @@ namespace FindETWProviderImage
 
                     if (DefaultVal.Equals(ProviderName, StringComparison.OrdinalIgnoreCase))
                     {
-                        ImagePath = NormalizePath(RegSubKey.GetValue("MessageFileName").ToString());
+                        ImagePath = NormalizePath(RegSubKey.GetValue("ResourceFileName").ToString());
                         return SubKeyName;
                     }
                 }
